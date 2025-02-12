@@ -27,13 +27,10 @@ body {
 }
 
 .gradient-text {
-    background: linear-gradient(45deg, #FFD700, #FFA500);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
+    background: none; /* Remove the gradient */
+    color: white; /* Set text color to white */
 }
+
 
 .contact-info {
     display: flex;
@@ -44,6 +41,16 @@ body {
 
 .contact-info i {
     margin-right: 0.5rem;
+    color: white;
+}
+
+.contact-info a {
+    color: white; /* Make links white */
+    text-decoration: none; /* Optional: Remove underline */
+}
+
+.contact-info a:hover {
+    color: var(--accent); /* Optional: Change color on hover */
 }
 
 .social-links {
