@@ -155,467 +155,639 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>Meeting Bingo</title>
-  <style>
-    :root{--bg:#0b0f14;--card:#121822;--muted:#93a1b1;--text:#e6edf3;--accent:#5ac8fa;--green:#34c759;--red:#ff3b30;--yellow:#ffd60a}
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0;background:linear-gradient(180deg,#0b0f14,#0f1520);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,Arial,sans-serif}
-    .wrap{max-width:980px;margin:0 auto;padding:16px 16px 80px}
-    .appbar{position:sticky;top:0;z-index:10;background:rgba(11,15,20,.85);backdrop-filter:saturate(180%) blur(8px);border-bottom:1px solid #1f2632}
-    .appbar-inner{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 16px}
-    .brand{display:flex;gap:10px;align-items:center}
-    .logo{width:28px;height:28px;border-radius:8px;background:radial-gradient(circle at 30% 30%,var(--accent),#7df);box-shadow:0 0 16px #5ac8fa55 inset,0 0 24px #5ac8fa33}
-    h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
-    .tabs{display:flex;gap:6px}
-    .tab{border:1px solid #1f2632;background:#0f1520;color:#cbd5e1;padding:8px 12px;border-radius:10px;cursor:pointer}
-    .tab.active{background:#162233;color:var(--text);border-color:#223047}
-
-    .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-    .card{background:linear-gradient(180deg,#121822,#0d131c);border:1px solid #1f2632;border-radius:14px;box-shadow:0 6px 24px #00000040;padding:14px}
-    .panel{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-    .panel .card h3{margin:0 0 8px;font-size:14px;color:#cbd5e1}
-    textarea,input,select,button{width:100%;border-radius:10px;border:1px solid #233044;background:#0c131c;color:var(--text);padding:10px;font-size:14px}
-    textarea{min-height:120px;resize:vertical}
-    .row{display:flex;gap:10px;align-items:center}
-    .row>span{white-space:nowrap;color:#cbd5e1;font-size:13px}
-    .controls{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
-    button{cursor:pointer}
-    button.primary{background:linear-gradient(180deg,#1d4ed8,#0f3ba1);border-color:#2552b9}
-    button.ghost{background:#0c131c;border-color:#243042}
-    .hint{font-size:12px;color:#93a1b1}
-
-    /* Bingo board */
-    .board{margin-top:14px}
-    .cell{aspect-ratio:1/1;border-radius:12px;border:1px solid #253042;padding:10px;background:linear-gradient(180deg,#0f1622,#0b111b);display:flex;align-items:center;justify-content:center;text-align:center;font-size:13px;line-height:1.2;position:relative}
-    .cell small{position:absolute;top:8px;left:10px;color:#8aa2b2;font-size:11px}
-    .cell .label{padding-top:6px}
-    .cell.free{background:linear-gradient(180deg,#082c1b,#071c12);border-color:#1f613f}
-    .cell.marked{background:linear-gradient(180deg,#0b2a42,#081c2d);border-color:#2b8bd6;box-shadow:inset 0 0 0 2px #2b8bd6aa}
-    .cell.marked:after{content:"✔";position:absolute;right:8px;bottom:6px;font-weight:700;color:var(--accent);font-size:16px}
-
-    .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #273244;background:#0b111b;color:#cbd5e1;padding:6px 10px;border-radius:999px;font-size:12px}
-    .pill .dot{width:8px;height:8px;border-radius:50%}
-    .dot.often{background:var(--green)}
-    .dot.medium{background:var(--yellow)}
-    .dot.rare{background:var(--red)}
-
-    .footer{margin-top:16px;color:#8aa2b2;font-size:12px}
-
-    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:#0d1826;border:1px solid #22324a;padding:10px 14px;border-radius:10px;color:#dbeafe;box-shadow:0 10px 30px #0006;z-index:20;display:none}
-    .toast.show{display:block}
-    .bingo-banner{background:linear-gradient(90deg,#0ea5e9,#22c55e,#eab308,#ef4444);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;letter-spacing:.5px}
-
-    @media (max-width: 820px){
-      .panel{grid-template-columns:1fr}
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meeting Bingo</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#111827; --ink:#e5e7eb; --muted:#9ca3af; --accent:#22c55e; --warn:#f59e0b; --err:#ef4444;
+    --tick:#16a34a; --tile:#1f2937; --tile-checked:#10b98122; --tile-stroke:#374151; --tile-win:#10b98155;
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:20px}
+  h1{margin:8px 0 16px;font-size:28px}
+  h2{margin:18px 0 8px;font-size:18px;color:var(--muted);font-weight:600}
+  .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .col{flex:1 1 240px;min-width:240px}
+  textarea, input, select {width:100%;box-sizing:border-box;background:#0b1220;color:var(--ink);border:1px solid #223;outline:none;border-radius:10px;padding:10px;font-size:14px}
+  textarea{min-height:140px;resize:vertical}
+  label{display:block;margin:6px 0 6px;color:var(--muted);font-size:13px}
+  .btn{appearance:none;border:none;border-radius:12px;padding:12px 14px;background:#1f2937;color:#fff;font-weight:600;cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.primary{background:var(--accent);color:#06210f}
+  .btn.ghost{background:#0b1220}
+  .btn.warn{background:var(--warn);color:#2b1b00}
+  .btn.err{background:var(--err)}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+  .note{color:var(--muted);font-size:13px}
+  .error{color:var(--err);font-weight:600}
+  .success{color:var(--accent);font-weight:600}
+  /* Board */
+  .board {display:grid;gap:10px;margin-top:16px}
+  .tile{user-select:none;-webkit-tap-highlight-color:transparent; background:var(--tile); border:1px solid var(--tile-stroke); border-radius:14px; padding:10px;
+        display:flex; align-items:center; justify-content:center; text-align:center; min-height:72px; line-height:1.25; font-size:14px; cursor:pointer}
+  .tile.checked{background:var(--tile-checked); border-color:var(--accent); box-shadow:inset 0 0 0 2px var(--accent)}
+  .tile.win { box-shadow:0 0 0 3px var(--accent), inset 0 0 0 2px var(--accent); }
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  .spacer{flex:1}
+  .pill{font-size:12px;color:var(--muted)}
+  .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, monospace;background:#0b1220;border:1px solid #223;padding:2px 6px;border-radius:6px;color:#cbd5e1}
+  .footer{margin:20px 0;color:var(--muted);font-size:12px}
+</style>
 </head>
 <body>
-  <div class="appbar">
-    <div class="appbar-inner">
-      <div class="brand"><div class="logo"></div><h1>Meeting Bingo</h1></div>
-      <div class="tabs">
-        <button class="tab active" data-tab="setup">Setup</button>
-        <button class="tab" data-tab="play">Play</button>
+<div class="wrap">
+
+  <div id="view-setup" class="card" hidden>
+    <h1>Meeting Bingo — Setup</h1>
+    <p class="note">Paste each event on a new line. These lists are encoded into the share link—no server needed.</p>
+
+    <div class="row">
+      <div class="col">
+        <h2>Often</h2>
+        <textarea id="oftenTxt"></textarea>
+        <label><span>Count to place from “Often”</span>
+          <input id="countOften" type="number" min="0" step="1" value="12">
+        </label>
       </div>
+      <div class="col">
+        <h2>Medium</h2>
+        <textarea id="mediumTxt"></textarea>
+        <label><span>Count to place from “Medium”</span>
+          <input id="countMedium" type="number" min="0" step="1" value="8">
+        </label>
+      </div>
+      <div class="col">
+        <h2>Rare</h2>
+        <textarea id="rareTxt"></textarea>
+        <label><span>Count to place from “Rare”</span>
+          <input id="countRare" type="number" min="0" step="1" value="5">
+        </label>
+      </div>
+    </div>
+
+    <div class="row card">
+      <div class="col">
+        <label>Board size (NxN)
+          <input id="boardSize" type="number" min="3" max="7" value="5">
+        </label>
+        <label><input id="freeCenter" type="checkbox"> Use free center tile</label>
+        <div class="note">Counts must sum to <span id="needCells">25</span>. Use <span class="kbd">Auto-fit</span> to fix.</div>
+      </div>
+      <div class="col">
+        <label>Board Title (optional)
+          <input id="boardTitle" type="text" placeholder="e.g., Team Stand-Up Bingo">
+        </label>
+        <label>Host name (optional)
+          <input id="hostName" type="text" placeholder="e.g., Ilia">
+        </label>
+      </div>
+      <div class="col">
+        <h2>Actions</h2>
+        <div class="btn-row">
+          <button class="btn warn" id="btnAutofit" type="button">Auto-fit counts</button>
+          <button class="btn ghost" id="btnResetToDefaults" type="button">Reset to defaults</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary" id="btnMakeLink" type="button">Copy link for everyone</button>
+      <button class="btn" id="btnPreviewBoard" type="button">Open board here</button>
+      <button class="btn ghost" id="btnExport" type="button">Export JSON</button>
+      <button class="btn ghost" id="btnImport" type="button">Import JSON</button>
+      <span id="status" class="pill"></span>
     </div>
   </div>
 
-  <div class="wrap">
-    <div id="setup" class="tabpane">
-      <div class="panel">
-        <div class="card">
-          <h3>Event lists</h3>
-          <div class="row">
-            <span>Often</span>
-            <span class="pill"><span class="dot often"></span>common</span>
-          </div>
-          <textarea id="often"></textarea>
-          <div class="row" style="margin-top:10px">
-            <span>Medium</span>
-            <span class="pill"><span class="dot medium"></span>sometimes</span>
-          </div>
-          <textarea id="medium"></textarea>
-          <div class="row" style="margin-top:10px">
-            <span>Rare</span>
-            <span class="pill"><span class="dot rare"></span>uncommon</span>
-          </div>
-          <textarea id="rare"></textarea>
-          <div class="hint" style="margin-top:6px">One event per line. Examples are prefilled — edit them to match your team.</div>
-        </div>
-
-        <div class="card">
-          <h3>Board & generation</h3>
-          <div class="row">
-            <span>Board size</span>
-            <select id="size">
-              <option value="5">5 × 5</option>
-              <option value="4">4 × 4</option>
-              <option value="3">3 × 3</option>
-            </select>
-          </div>
-          <div class="row" style="margin-top:8px">
-            <span>Free center</span>
-            <select id="free">
-              <option value="true">Yes (FREE)</option>
-              <option value="false">No</option>
-            </select>
-          </div>
-          <div class="row" style="margin-top:8px">
-            <span>Counts mode</span>
-            <select id="countMode">
-              <option value="fixed">Fixed (manual counts)</option>
-              <option value="auto">Auto (by ratio)</option>
-            </select>
-          </div>
-          <div class="row" id="countsRow" style="margin-top:8px">
-            <span>Counts (O/M/R)</span>
-            <input id="counts" placeholder="e.g. 12,8,4" />
-          </div>
-          <div class="row" id="ratiosRow" style="margin-top:8px; display:none">
-            <span>Ratios (O/M/R)</span>
-            <input id="ratios" placeholder="e.g. 0.5,0.33,0.17" />
-          </div>
-          <div class="row" style="margin-top:8px">
-            <span>Seed</span>
-            <input id="seed" placeholder="optional – same seed ⇒ same board" />
-          </div>
-          <div class="controls">
-            <button class="primary" id="generate">Generate board</button>
-            <button class="ghost" id="random-seed">Randomize seed</button>
-            <button class="ghost" id="share">Copy share link</button>
-            <button class="ghost" id="export">Export config</button>
-            <button class="ghost" id="import">Import config</button>
-          </div>
-          <div class="hint" style="margin-top:8px">Counts must add up to cell count (minus 1 if free center is ON). Example for 5×5 with FREE: 12 often, 8 medium, 4 rare ⇒ 24 total.</div>
-        </div>
+  <div id="view-board" class="card" hidden>
+    <div class="toolbar">
+      <div>
+        <h1 id="titleBoard">Meeting Bingo</h1>
+        <div class="pill" id="subtitle"></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="btn-row">
+        <button class="btn" id="btnNewBoard" type="button" title="Create a new random board for yourself">New board</button>
+        <button class="btn" id="btnClearMarks" type="button" title="Uncheck all tiles">Reset marks</button>
+        <button class="btn ghost" id="btnCopyGameLink" type="button" title="Share the game link (others get their own random boards)">Copy game link</button>
+        <button class="btn ghost" id="btnGoSetup" type="button">Setup</button>
       </div>
     </div>
 
-    <div id="play" class="tabpane" style="display:none">
-      <div class="card">
-        <div class="row" style="justify-content:space-between">
-          <div class="row" style="gap:8px"><span class="pill"><span class="dot often"></span>Often</span><span class="pill"><span class="dot medium"></span>Medium</span><span class="pill"><span class="dot rare"></span>Rare</span></div>
-          <div class="controls" style="gap:8px">
-            <button id="reset">Reset marks</button>
-            <button id="re-roll">Re-roll (new board)</button>
-          </div>
-        </div>
-        <div class="board">
-          <div id="grid" class="grid"></div>
-        </div>
-        <div class="footer">Tap a square to mark it. Get a row, column, or diagonal for <span class="bingo-banner">BINGO!</span></div>
-      </div>
+    <div id="warnBox" class="pill"></div>
+    <div id="board" class="board"></div>
+
+    <div class="footer">
+      Pro tip: each player taps <b>New board</b> if they want to reshuffle. Your marks are saved on your device.
     </div>
   </div>
 
-  <div id="toast" class="toast"></div>
+</div>
 
- <script>
-  // ---- Utilities ----
-  const qs = (sel, el=document) => el.querySelector(sel);
-  const qsa = (sel, el=document) => [...el.querySelectorAll(sel)];
+<script>
+/* ---------- Utilities (UTF-8 safe Base64) ---------- */
+const utf8ToB64 = (str) => btoa(unescape(encodeURIComponent(str)));
+const b64ToUtf8 = (str) => decodeURIComponent(escape(atob(str)));
 
-  const store = {
-    get k(){ return 'meeting-bingo-v1' },
-    save(cfg){ localStorage.setItem(this.k, JSON.stringify(cfg)); },
-    load(){ try{ return JSON.parse(localStorage.getItem(this.k) || '{}'); }catch{ return {}; } }
+function sampleWithoutReplacement(arr, n, rng) {
+  const a = arr.slice();
+  // Fisher-Yates with seeded RNG
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, Math.min(n, a.length));
+}
+
+function seededRNG(seed) {
+  // Mulberry32
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = Math.imul(31, h) + seed.charCodeAt(i) | 0;
+  }
+  let t = h >>> 0;
+  return function() {
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
   };
+}
 
-  function mulberry32(seed){
-    let t = seed >>> 0;
-    return function(){ t += 0x6D2B79F5; let r = Math.imul(t ^ t >>> 15, 1 | t); r ^= r + Math.imul(r ^ r >>> 7, 61 | r); return ((r ^ r >>> 14) >>> 0) / 4294967296; };
-  }
-  function xmur3(str){ let h=1779033703^str.length; for(let i=0;i<str.length;i++){ h=Math.imul(h^str.charCodeAt(i),3432918353); h=h<<13|h>>>19 } return ()=>{ h=Math.imul(h^h>>>16,2246822507); h=Math.imul(h^h>>>13,3266489909); return (h^h>>>16)>>>0 } }
-  function seededShuffle(arr, rnd){ const a=[...arr]; for(let i=a.length-1;i>0;i++){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a }
+function uuid() {
+  const a = crypto.getRandomValues(new Uint8Array(16));
+  a[6] = (a[6] & 0x0f) | 0x40; // version 4
+  a[8] = (a[8] & 0x3f) | 0x80;
+  return [...a].map((b,i)=>([4,6,8,10].includes(i)?'-':'') + b.toString(16).padStart(2,'0')).join('');
+}
 
-  function copy(text){ navigator.clipboard.writeText(text).then(()=>toast('Copied link to clipboard')); }
-  function toast(msg, t=2200){ const el=qs('#toast'); el.textContent = msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), t) }
+function byId(id){return document.getElementById(id);}
+function textLines(v){ return v.split(/\r?\n/).map(s=>s.trim()).filter(Boolean); }
 
-  // ---- Defaults ----
-  const defaults = {
-    size: 5,
-    free: true,
-    countMode: 'fixed',
-    counts: { often: 12, medium: 8, rare: 4 },
-    ratios: { often: 0.5, medium: 0.33, rare: 0.17 },
-    lists: {
-      often: [
-        'Someone says “you\'re on mute”','Awkward 5s silence','“Can you see my screen?”',
-        'Dog or cat cameo','Join/leave chime','Action item assigned','Someone shares the wrong screen',
-        'Wi‑Fi hiccup / robot voice','“Let\'s take this offline”','Keyboard clacking is heard',
-        'Tab explosion in browser','Late joiner asks for recap','Emoji reaction blast',
-        'Someone eating on mic','Background blur toggled'
-      ],
-      medium: [
-        'Spreadsheet is live‑edited','Calendar double‑book conflict','Screen share permission issue',
-        'Unexpected guest joins','Reference to last quarter','Poll launched','“Circling back” appears',
-        'Time zone confusion','Microphone feedback squeal','AI note‑taker joins the call'
-      ],
-      rare: [
-        'Power outage / total drop','Meeting ends early (≥10m)','Live demo actually works first try',
-        'Pet walks on keyboard','Someone joins from a car','Two people talk in unison >3×',
-        'Camera falls over','Whiteboard drawing appears'
-      ]
-    },
-    seed: ''
+/* ---------- Routing ---------- */
+function showSetup(){ byId('view-setup').hidden=false; byId('view-board').hidden=true; }
+function showBoard(){ byId('view-setup').hidden=true; byId('view-board').hidden=false; }
+
+/* ---------- Defaults (your lists pre-filled) ---------- */
+const DEFAULTS = {
+  size: 5,
+  freeCenter: false,
+  title: 'Meeting Bingo',
+  host: '',
+  events: {
+    often: [
+      "Жена Ленина",
+      "Да помолчи (Сергей Андрею)",
+      "Лариса Андрею: потише",
+      "Без пузыря",
+      "Историческая минутка",
+      "Знаете из какого это фильма?",
+      "На работе нет денег",
+      "Младший из помёта",
+      "Андрей/Лариса поправляет челку"
+    ],
+    medium: [
+      "Ремонт (все время на проекте) + посмотрели сериал",
+      "Лариса Андрею: слезь с бронивика",
+      "Мы с Ильей что-то сделали не так",
+      "Лариса и Андрей: в России хорошо",
+      "Рандомный вопрос от Ларисы для беседы",
+      "История про торт от Ларисы",
+      "Похвала еды (много)"
+    ],
+    rare: [
+      "Вопрос про Катину работу",
+      "Мотоцикл для Кати",
+      "Вопрос про Жору",
+      "Саша и Катя не так одеты",
+      "Вопрос про вонючую воду",
+      "Говнюшка про бабулю/дедулю",
+      "Лариса про ногти",
+      "Проебали рейс",
+      "Пердёж про музеи",
+      "Грузинский ресторан",
+      "Приглашать Сашу и Катю в колледж"
+    ]
+  },
+  counts: { often:12, medium:8, rare:5 }
+};
+
+/* ---------- Setup view logic ---------- */
+function readSetup() {
+  const size = Math.max(3, Math.min(7, parseInt(byId('boardSize').value||'5',10)));
+  const freeCenter = byId('freeCenter').checked;
+  const title = byId('boardTitle').value.trim() || 'Meeting Bingo';
+  const host = byId('hostName').value.trim();
+
+  const events = {
+    often: textLines(byId('oftenTxt').value),
+    medium: textLines(byId('mediumTxt').value),
+    rare: textLines(byId('rareTxt').value),
   };
-
-  // ---- State ----
-  let cfg = { ...defaults, ...store.load() };
-
-  // ---- UI wiring ----
-  const els = {
-    often: qs('#often'), medium: qs('#medium'), rare: qs('#rare'),
-    size: qs('#size'), free: qs('#free'),
-    countMode: qs('#countMode'), counts: qs('#counts'), ratios: qs('#ratios'),
-    seed: qs('#seed'),
-    grid: qs('#grid'),
-    setupTab: qs('[data-tab="setup"]'), playTab: qs('[data-tab="play"]'),
-    setupPane: qs('#setup'), playPane: qs('#play')
+  const counts = {
+    often: Math.max(0, parseInt(byId('countOften').value||'0',10)),
+    medium: Math.max(0, parseInt(byId('countMedium').value||'0',10)),
+    rare: Math.max(0, parseInt(byId('countRare').value||'0',10)),
   };
+  return { size, freeCenter, title, host, events, counts };
+}
 
-  function applyCfgToInputs(){
-    els.often.value = cfg.lists.often.join('\n');
-    els.medium.value = cfg.lists.medium.join('\n');
-    els.rare.value = cfg.lists.rare.join('\n');
-    els.size.value = String(cfg.size);
-    els.free.value = String(cfg.free);
-    els.countMode.value = cfg.countMode || 'fixed';
-    els.counts.value = `${cfg.counts.often},${cfg.counts.medium},${cfg.counts.rare}`;
-    els.ratios.value = `${cfg.ratios.often},${cfg.ratios.medium},${cfg.ratios.rare}`;
-    els.seed.value = cfg.seed || '';
-    toggleCountsUi();
-  }
+function writeSetup(cfg){
+  byId('boardSize').value = cfg.size;
+  byId('freeCenter').checked = !!cfg.freeCenter;
+  byId('boardTitle').value = cfg.title || '';
+  byId('hostName').value = cfg.host || '';
+  byId('oftenTxt').value = (cfg.events.often||[]).join('\n');
+  byId('mediumTxt').value = (cfg.events.medium||[]).join('\n');
+  byId('rareTxt').value = (cfg.events.rare||[]).join('\n');
+  byId('countOften').value = cfg.counts.often ?? 0;
+  byId('countMedium').value = cfg.counts.medium ?? 0;
+  byId('countRare').value = cfg.counts.rare ?? 0;
+  updateNeedCells();
+}
 
-  function readCfgFromInputs(){
-    const parseList = v => v.split('\n').map(s=>s.trim()).filter(Boolean);
-    const [o,m,r] = (els.counts.value || '').split(',').map(x=>parseInt(x.trim(),10)).map(x=>isFinite(x)?x:0);
-    const [ro,rm,rr] = (els.ratios.value || '').split(',').map(x=>parseFloat(x.trim())).map(x=>isFinite(x)?x:0);
-    cfg = {
-      ...cfg,
-      size: parseInt(els.size.value,10),
-      free: els.free.value === 'true',
-      countMode: els.countMode.value,
-      counts: { often:o, medium:m, rare:r },
-      ratios: { often:ro, medium:rm, rare:rr },
-      lists: {
-        often: parseList(els.often.value),
-        medium: parseList(els.medium.value),
-        rare: parseList(els.rare.value)
-      },
-      seed: els.seed.value.trim()
-    };
-    store.save(cfg);
-  }
+function updateNeedCells(){
+  const n = parseInt(byId('boardSize').value||'5',10);
+  const freeCenter = byId('freeCenter').checked;
+  const totalCells = n*n - (freeCenter && n%2===1 ? 1 : 0);
+  byId('needCells').textContent = String(totalCells);
+}
 
-  // URL state (shareable)
-  function encodeCfg(c){
-    const skinny = { size:c.size, free:c.free, counts:c.counts, seed:c.seed, lists:c.lists };
-    const json = JSON.stringify(skinny);
-    return btoa(unescape(encodeURIComponent(json)));
+function validateCounts(cfg){
+  const n = cfg.size;
+  const freeCtr = cfg.freeCenter && n%2===1 ? 1 : 0;
+  const need = n*n - freeCtr;
+  const have = cfg.counts.often + cfg.counts.medium + cfg.counts.rare;
+  if (have !== need) {
+    throw new Error(`Counts must sum to ${need}, but got ${have}. Use Auto-fit or adjust manually.`);
   }
-  function decodeCfg(s){
-    try{ const json = decodeURIComponent(escape(atob(s))); return JSON.parse(json); }catch{ return null }
+  // Ensure enough unique items total (we won’t duplicate unless forced)
+  const totalUnique = new Set([
+    ...cfg.events.often, ...cfg.events.medium, ...cfg.events.rare
+  ]).size;
+  if (totalUnique < need) {
+    throw new Error(`Not enough unique events (${totalUnique}) to fill ${need} cells. Add more lines or reduce counts.`);
   }
-  function params(){ const p=new URLSearchParams(location.search); return p }
-  function useUrlConfigIfAny(){
-    const p = params();
-    if(p.has('c')){
-      const conf = decodeCfg(p.get('c'));
-      if(conf){ cfg = { ...cfg, ...conf }; store.save(cfg); }
+  // Category-specific availability warnings (not fatal; we’ll clamp later if needed)
+  const warns = [];
+  for (const k of ['often','medium','rare']) {
+    if ((cfg.events[k]||[]).length < cfg.counts[k]) {
+      warns.push(`Category “${k}” needs ${cfg.counts[k]} but has only ${cfg.events[k].length}.`);
     }
-    if(p.has('seed')){ cfg.seed = p.get('seed'); }
   }
-  function updateUrlForShare(){
-    const p = new URLSearchParams();
-    p.set('c', encodeCfg(cfg));
-    if(cfg.seed) p.set('seed', cfg.seed);
-    const url = `${location.origin}${location.pathname}?${p.toString()}`;
-    return url;
+  return warns;
+}
+
+function autoFitCounts(){
+  const size = Math.max(3, Math.min(7, parseInt(byId('boardSize').value||'5',10)));
+  const freeCenter = byId('freeCenter').checked && (size%2===1);
+  const need = size*size - (freeCenter ? 1 : 0);
+  // Defaults weight: often 12, medium 8, rare 5 for 25 → weights 12/25, 8/25, 5/25
+  const w = {often:12, medium:8, rare:5};
+  const scale = need/25;
+  let counts = {
+    often: Math.max(0, Math.round(w.often*scale)),
+    medium: Math.max(0, Math.round(w.medium*scale)),
+    rare: Math.max(0, Math.round(w.rare*scale))
+  };
+  // fix rounding drift
+  let sum = counts.often + counts.medium + counts.rare;
+  while (sum !== need) {
+    const order = ['often','medium','rare'];
+    const k = order[(Math.abs(need-sum)) % 3];
+    if (sum < need) counts[k]++; else if (counts[k]>0) counts[k]--;
+    sum = counts.often + counts.medium + counts.rare;
+  }
+  byId('countOften').value = counts.often;
+  byId('countMedium').value = counts.medium;
+  byId('countRare').value = counts.rare;
+}
+
+function configToLink(cfg, withSeed){
+  const payload = { v:1, ...cfg };
+  const cfgB64 = utf8ToB64(JSON.stringify(payload));
+  let url = location.origin + location.pathname + '#/board?cfg=' + encodeURIComponent(cfgB64);
+  if (withSeed) {
+    const seed = uuid();
+    url += '&seed=' + encodeURIComponent(seed);
+  }
+  return url;
+}
+
+function parseHashQuery() {
+  // Expect like #/board?cfg=...&seed=...
+  const hash = location.hash || '';
+  const qidx = hash.indexOf('?');
+  let route = hash.slice(1, qidx === -1 ? undefined : qidx);
+  if (!route) route = '/setup';
+  const params = new URLSearchParams(qidx===-1 ? '' : hash.slice(qidx+1));
+  return {route, params};
+}
+
+/* ---------- Board generation ---------- */
+function buildBoard(cfg, seed) {
+  const rng = seededRNG(String(seed||'seed'));
+  const N = cfg.size;
+  const freeCenter = cfg.freeCenter && (N%2===1);
+  const need = N*N - (freeCenter?1:0);
+
+  // Clamp each category to availability (we warn earlier)
+  const pickOften  = sampleWithoutReplacement(cfg.events.often,  cfg.counts.often,  rng);
+  const pickMedium = sampleWithoutReplacement(cfg.events.medium, cfg.counts.medium, rng);
+  const pickRare   = sampleWithoutReplacement(cfg.events.rare,   cfg.counts.rare,   rng);
+  let pool = [...pickOften, ...pickMedium, ...pickRare];
+
+  // If some category lacked items (pool smaller than need), fill from remaining unique items
+  if (pool.length < need) {
+    const all = [...new Set([...cfg.events.often, ...cfg.events.medium, ...cfg.events.rare])];
+    const unused = all.filter(x => !pool.includes(x));
+    // shuffle unused with rng
+    for (let i = unused.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [unused[i], unused[j]] = [unused[j], unused[i]];
+    }
+    pool = pool.concat(unused.slice(0, need - pool.length));
+  }
+  // Final shuffle
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
   }
 
-  // Bingo generation
-  function hashSeed(s){ const h=xmur3(s||'default-seed'); return mulberry32(h()); }
-  function pickFrom(list, n, rnd){
-    if(n<=0) return [];
-    const uniq = [...new Set(list)];
-    if(uniq.length < n) throw new Error(`Not enough unique items (need ${n}, have ${uniq.length})`);
-    return seededShuffle(uniq, rnd).slice(0,n);
-  }
-  function normalizeRatios(r){
-    const sum = r.often + r.medium + r.rare;
-    if(sum <= 0) return {often:1, medium:0, rare:0};
-    return { often:r.often/sum, medium:r.medium/sum, rare:r.rare/sum };
-  }
-  function allocateCounts(total, ratios, avail){
-    const r = normalizeRatios(ratios);
-    const raw = { often: total*r.often, medium: total*r.medium, rare: total*r.rare };
-    const base = { often: Math.floor(raw.often), medium: Math.floor(raw.medium), rare: Math.floor(raw.rare) };
-    let assigned = base.often + base.medium + base.rare;
-    const rema = [ ['often', raw.often - base.often], ['medium', raw.medium - base.medium], ['rare', raw.rare - base.rare] ]
-      .sort((a,b)=>b[1]-a[1]);
-    while(assigned < total){
-      for(const [k] of rema){ if(assigned>=total) break; base[k]++; assigned++; }
-    }
-    const result = {...base};
-    const keys = ['often','medium','rare'];
-    let overflow = 0;
-    for(const k of keys){ if(result[k] > avail[k]){ overflow += (result[k]-avail[k]); result[k]=avail[k]; } }
-    while(overflow > 0){
-      let moved=false;
-      for(const k of keys){
-        const room = Math.max(0, avail[k]-result[k]);
-        if(room>0){ const add=Math.min(room, overflow); result[k]+=add; overflow-=add; moved=true; if(overflow===0) break; }
+  // Insert FREE center if enabled
+  const cells = [];
+  let idx = 0;
+  for (let r=0;r<N;r++){
+    for (let c=0;c<N;c++){
+      if (freeCenter && r===Math.floor(N/2) && c===Math.floor(N/2)) {
+        cells.push({text:'FREE', free:true});
+      } else {
+        cells.push({text: pool[idx++] || ''});
       }
-      if(!moved) break;
     }
-    const sumRes = result.often + result.medium + result.rare;
-    return {counts:result, sum:sumRes};
+  }
+  return cells;
+}
+
+function storageKey(cfgHash, seed){ return `bingo:${cfgHash}:seed:${seed}:marks`; }
+function hashStr(s){
+  let h=0; for(let i=0;i<s.length;i++){ h=((h<<5)-h)+s.charCodeAt(i); h|=0; }
+  return String(h>>>0);
+}
+
+function renderBoard(cfg, seed){
+  const boardEl = byId('board');
+  const titleEl = byId('titleBoard');
+  const subEl = byId('subtitle');
+  const warnEl = byId('warnBox');
+
+  // grid
+  boardEl.style.gridTemplateColumns = `repeat(${cfg.size}, 1fr)`;
+
+  titleEl.textContent = cfg.title || 'Meeting Bingo';
+  const parts = [];
+  if (cfg.host) parts.push(`Host: ${cfg.host}`);
+  parts.push(`Board: ${cfg.size}×${cfg.size}${cfg.freeCenter && cfg.size%2===1 ? ', free center' : ''}`);
+  subEl.textContent = parts.join(' · ');
+
+  // warnings already checked at setup; still show soft note if needed
+  warnEl.textContent = '';
+  const softs = [];
+  if (cfg.events.often.length < cfg.counts.often)  softs.push(`“Often” short by ${cfg.counts.often - cfg.events.often.length}`);
+  if (cfg.events.medium.length < cfg.counts.medium)softs.push(`“Medium” short by ${cfg.counts.medium - cfg.events.medium.length}`);
+  if (cfg.events.rare.length < cfg.counts.rare)    softs.push(`“Rare” short by ${cfg.counts.rare - cfg.events.rare.length}`);
+  if (softs.length) warnEl.textContent = 'Heads-up: ' + softs.join('; ') + '. Filled with other unique items.';
+
+  const cells = buildBoard(cfg, seed);
+  const cfgHash = hashStr(JSON.stringify(cfg));
+  const key = storageKey(cfgHash, seed);
+  let marks = {};
+  try { marks = JSON.parse(localStorage.getItem(key)||'{}') } catch { marks = {}; }
+
+  boardEl.innerHTML = '';
+  cells.forEach((cell, i)=>{
+    const d = document.createElement('div');
+    d.className = 'tile';
+    d.setAttribute('role','button');
+    d.setAttribute('aria-pressed', marks[i] ? 'true' : 'false');
+    d.textContent = cell.text;
+    if (cell.free) {
+      d.classList.add('checked');
+      d.classList.add('win'); // highlight FREE a bit
+      marks[i] = true;
+    } else if (marks[i]) {
+      d.classList.add('checked');
+    }
+    d.addEventListener('click', ()=>{
+      const now = d.classList.toggle('checked');
+      d.setAttribute('aria-pressed', now ? 'true' : 'false');
+      marks[i] = now;
+      localStorage.setItem(key, JSON.stringify(marks));
+      updateWinLines(boardEl, cfg.size);
+    }, {passive:true});
+    boardEl.appendChild(d);
+  });
+  updateWinLines(boardEl, cfg.size);
+}
+
+function updateWinLines(boardEl, N){
+  // simple bingo detection; add .win to tiles in any full row/col/diagonal
+  const tiles = [...boardEl.querySelectorAll('.tile')];
+  const idx = (r,c)=> r*N + c;
+  // clear wins
+  tiles.forEach(t => t.classList.remove('win'));
+  const lines = [];
+  // rows
+  for (let r=0;r<N;r++){
+    const row = Array.from({length:N}, (_,c)=>idx(r,c));
+    if (row.every(i=>tiles[i].classList.contains('checked'))) lines.push(row);
+  }
+  // cols
+  for (let c=0;c<N;c++){
+    const col = Array.from({length:N}, (_,r)=>idx(r,c));
+    if (col.every(i=>tiles[i].classList.contains('checked'))) lines.push(col);
+  }
+  // diagonals
+  const d1 = Array.from({length:N}, (_,k)=>idx(k,k));
+  const d2 = Array.from({length:N}, (_,k)=>idx(k,N-1-k));
+  if (d1.every(i=>tiles[i].classList.contains('checked'))) lines.push(d1);
+  if (d2.every(i=>tiles[i].classList.contains('checked'))) lines.push(d2);
+
+  lines.forEach(line => line.forEach(i=>tiles[i].classList.add('win')));
+}
+
+/* ---------- View wiring ---------- */
+function toSetup(){
+  history.replaceState(null, '', location.pathname + '#/setup');
+  showSetup();
+}
+
+function toBoard(cfg, seed){
+  const cfgB64 = utf8ToB64(JSON.stringify({v:1, ...cfg}));
+  const qs = new URLSearchParams();
+  qs.set('cfg', cfgB64);
+  if (seed) qs.set('seed', seed);
+  history.replaceState(null, '', location.pathname + '#/board?' + qs.toString());
+  showBoard();
+  renderBoard(cfg, seed || ensureSeedInUrl());
+}
+
+function ensureSeedInUrl(){
+  const {params} = parseHashQuery();
+  let seed = params.get('seed');
+  if (!seed) {
+    seed = uuid();
+    params.set('seed', seed);
+    history.replaceState(null, '', location.pathname + '#/board?' + params.toString());
+  }
+  return seed;
+}
+
+function loadConfigFromHash(){
+  const {params} = parseHashQuery();
+  const cfgStr = params.get('cfg');
+  if (!cfgStr) return null;
+  try {
+    const cfg = JSON.parse(b64ToUtf8(cfgStr));
+    if (!cfg || cfg.v !== 1) return null;
+    // basic normalization
+    cfg.size = Math.max(3, Math.min(7, parseInt(cfg.size||5,10)));
+    cfg.freeCenter = !!cfg.freeCenter;
+    cfg.title = cfg.title || 'Meeting Bingo';
+    cfg.host = cfg.host || '';
+    cfg.events = cfg.events || {often:[],medium:[],rare:[]};
+    cfg.counts = cfg.counts || {often:0,medium:0,rare:0};
+    return cfg;
+  } catch {
+    return null;
+  }
+}
+
+/* ---------- Buttons & Init ---------- */
+function bindSetupHandlers(){
+  const status = byId('status');
+  function flash(msg, ok=true){
+    status.textContent = msg;
+    status.className = 'pill ' + (ok ? 'success' : 'error');
+    setTimeout(()=>{ status.textContent=''; status.className='pill'; }, 2500);
   }
 
-  function generateBoard(){
-    readCfgFromInputs();
-    const N = cfg.size;
-    const cellsCount = N*N - (cfg.free ? 1 : 0);
+  byId('boardSize').addEventListener('input', updateNeedCells);
+  byId('freeCenter').addEventListener('change', updateNeedCells);
 
-    let counts = { ...cfg.counts };
-    if(cfg.countMode === 'auto'){
-      const avail = { often: new Set(cfg.lists.often).size, medium: new Set(cfg.lists.medium).size, rare: new Set(cfg.lists.rare).size };
-      const {counts:autoCounts, sum} = allocateCounts(cellsCount, cfg.ratios, avail);
-      if(sum !== cellsCount){ toast(`Not enough unique items to fill ${cellsCount} cells. Add more events or adjust ratios.`); return; }
-      counts = autoCounts;
-    } else {
-      const needTotal = counts.often + counts.medium + counts.rare;
-      if(needTotal !== cellsCount){ toast(`Counts must equal ${cellsCount} (you set ${needTotal}).`); return; }
-    }
+  byId('btnAutofit').addEventListener('click', ()=>{
+    autoFitCounts();
+    flash('Counts auto-fit.');
+  });
 
-    const rnd = cfg.seed ? hashSeed(cfg.seed) : hashSeed(String(Date.now()));
-    const chosen = [];
+  byId('btnResetToDefaults').addEventListener('click', ()=>{
+    writeSetup(DEFAULTS);
+    flash('Defaults restored.');
+  });
+
+  byId('btnExport').addEventListener('click', ()=>{
+    const cfg = readSetup();
+    const payload = JSON.stringify({v:1, ...cfg}, null, 2);
+    navigator.clipboard.writeText(payload).then(()=>flash('Config JSON copied.'));
+  });
+
+  byId('btnImport').addEventListener('click', async ()=>{
+    const txt = prompt('Paste config JSON:');
+    if (!txt) return;
     try{
-      chosen.push(...pickFrom(cfg.lists.often, counts.often, rnd).map(x=>({t:x,cat:'often'})));
-      chosen.push(...pickFrom(cfg.lists.medium, counts.medium, rnd).map(x=>({t:x,cat:'medium'})));
-      chosen.push(...pickFrom(cfg.lists.rare, counts.rare, rnd).map(x=>({t:x,cat:'rare'})));
-    }catch(e){ toast(e.message); return; }
-
-    const rnd2 = hashSeed((cfg.seed||'')+'-layout');
-    const tiles = seededShuffle(chosen, rnd2);
-
-    const grid = [];
-    let k=0;
-    for(let r=0;r<N;r++){
-      const row=[];
-      for(let c=0;c<N;c++){
-        if(cfg.free && r===Math.floor(N/2) && c===Math.floor(N/2)){
-          row.push({t:'FREE',cat:'free',marked:true});
-        }else{
-          row.push(tiles[k++]);
-        }
-      }
-      grid.push(row);
+      const obj = JSON.parse(txt);
+      if (!obj || obj.v !== 1) throw new Error('Bad version.');
+      writeSetup(obj);
+      flash('Config imported.');
+    }catch(e){
+      flash('Import failed: ' + e.message, false);
     }
-    renderBoard(grid);
-    els.playTab.click();
-    localStorage.setItem('meeting-bingo-last-grid', JSON.stringify({grid, N}));
-  }
+  });
 
-  function renderBoard(grid){
-    const N = grid.length;
-    els.grid.style.gridTemplateColumns = `repeat(${N},1fr)`;
-    els.grid.innerHTML = '';
-    grid.forEach((row, r)=>{
-      row.forEach((cell, c)=>{
-        const d=document.createElement('div');
-        d.className = 'cell'+(cell.cat==='free'?' free':'');
-        if(cell.marked) d.classList.add('marked');
-        d.dataset.r=r; d.dataset.c=c; d.dataset.cat=cell.cat;
-        d.innerHTML = `<small>${cell.cat}</small><div class="label">${escapeHtml(cell.t)}</div>`;
-        d.addEventListener('click', ()=>{
-          d.classList.toggle('marked');
-          checkBingo();
-          saveMarks();
-        });
-        els.grid.appendChild(d);
-      })
-    })
-    checkBingo();
-  }
-
-  function escapeHtml(str){ return str.replace(/[&<>\"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])) }
-  function saveMarks(){ const marks = qsa('.cell').map((el)=>el.classList.contains('marked')?1:0); localStorage.setItem('meeting-bingo-marks', JSON.stringify(marks)); }
-  function restoreMarks(){ const s = localStorage.getItem('meeting-bingo-marks'); if(!s) return; try{ const marks = JSON.parse(s); qsa('.cell').forEach((el,i)=>{ if(marks[i]) el.classList.add('marked'); else el.classList.remove('marked'); }); }catch{} }
-  function resetMarks(){ qsa('.cell').forEach(el=>el.classList.remove('marked')); saveMarks(); }
-
-  function checkBingo(){
-    const cells = qsa('.cell');
-    if(cells.length===0) return;
-    const N = Math.sqrt(cells.length);
-    const M = [...Array(N)].map(()=>Array(N).fill(false));
-    cells.forEach((el,i)=>{ const r=Math.floor(i/N), c=i%N; M[r][c]=el.classList.contains('marked') });
-
-    const lines=[];
-    for(let i=0;i<N;i++){
-      if(M[i].every(Boolean)) lines.push('row');
-      if(M.map(r=>r[i]).every(Boolean)) lines.push('col');
+  byId('btnMakeLink').addEventListener('click', ()=>{
+    try{
+      const cfg = readSetup();
+      const warns = validateCounts(cfg);
+      const url = configToLink(cfg, false);
+      navigator.clipboard.writeText(url).then(()=>{
+        flash('Share link copied!');
+      });
+      if (warns.length) flash('Note: ' + warns.join(' '), true);
+    }catch(e){
+      flash(e.message, false);
     }
-    if(M.map((r,i)=>r[i]).every(Boolean)) lines.push('diag');
-    if(M.map((r,i)=>r[N-1-i]).every(Boolean)) lines.push('diag');
-    if(lines.length>0){ toast(`BINGO! (${lines.length} line${lines.length>1?'s':''}) 🎉`, 1800); confetti(); }
-  }
+  });
 
-  function confetti(){
-    const n=80; const container=document.body; const w=window.innerWidth, h=window.innerHeight;
-    for(let i=0;i<n;i++){
-      const s=document.createElement('div');
-      s.style.position='fixed'; s.style.left=(Math.random()*w)+'px'; s.style.top='-10px'; s.style.width='6px'; s.style.height='10px';
-      s.style.background=`hsl(${Math.random()*360},90%,60%)`; s.style.opacity='0.9'; s.style.borderRadius='2px'; s.style.transform=`rotate(${Math.random()*360}deg)`;
-      s.style.zIndex=30; container.appendChild(s);
-      const dur=800+Math.random()*1200; const dx=(-40+Math.random()*80);
-      s.animate([{transform:s.style.transform, top:'-10px'},{transform:`translate(${dx}px, ${h+20}px) rotate(${Math.random()*360}deg)`, top:(h+20)+'px'}],{duration:dur, easing:'cubic-bezier(.2,.7,.2,1)'}).onfinish=()=>s.remove();
+  byId('btnPreviewBoard').addEventListener('click', ()=>{
+    try{
+      const cfg = readSetup();
+      const warns = validateCounts(cfg);
+      toBoard(cfg, null); // will add random seed
+      const statusBox = byId('warnBox');
+      if (warns.length) statusBox.textContent = 'Heads-up: ' + warns.join(' ');
+    }catch(e){
+      alert(e.message);
     }
+  });
+}
+
+function bindBoardHandlers(){
+  byId('btnGoSetup').addEventListener('click', toSetup);
+
+  byId('btnCopyGameLink').addEventListener('click', ()=>{
+    const cfg = loadConfigFromHash();
+    if (!cfg) { alert('No config found in link.'); return; }
+    const url = configToLink(cfg, false);
+    navigator.clipboard.writeText(url).then(()=>{ /* ok */ });
+  });
+
+  byId('btnNewBoard').addEventListener('click', ()=>{
+    const cfg = loadConfigFromHash();
+    if (!cfg) return toSetup();
+    const seed = uuid();
+    const {params} = parseHashQuery();
+    params.set('seed', seed);
+    history.replaceState(null, '', location.pathname + '#/board?' + params.toString());
+    renderBoard(cfg, seed);
+  });
+
+  byId('btnClearMarks').addEventListener('click', ()=>{
+    const cfg = loadConfigFromHash();
+    const {params} = parseHashQuery();
+    if (!cfg) return;
+    const seed = params.get('seed') || ensureSeedInUrl();
+    const key = storageKey(hashStr(JSON.stringify(cfg)), seed);
+    localStorage.removeItem(key);
+    renderBoard(cfg, seed);
+  });
+}
+
+function boot(){
+  bindSetupHandlers();
+  bindBoardHandlers();
+
+  const route = parseHashQuery().route;
+  if (route.startsWith('/board')) {
+    const cfg = loadConfigFromHash();
+    if (!cfg) {
+      // No config in URL → fall back to setup with defaults loaded
+      showSetup();
+      writeSetup(DEFAULTS);
+      return;
+    }
+    showBoard();
+    byId('titleBoard').textContent = cfg.title || 'Meeting Bingo';
+    renderBoard(cfg, ensureSeedInUrl());
+  } else {
+    showSetup();
+    writeSetup(DEFAULTS);
   }
+}
 
-  // ---- Event hooks ----
-  qsa('.tab').forEach(btn=>btn.addEventListener('click',()=>{
-    qsa('.tab').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    const tab = btn.dataset.tab;
-    qsa('.tabpane').forEach(p=>p.style.display='none');
-    qs('#'+tab).style.display='block';
-  }));
-
-  qs('#generate').addEventListener('click', generateBoard);
-  qs('#random-seed').addEventListener('click', ()=>{ els.seed.value = Math.random().toString(36).slice(2,10); toast('New random seed set'); });
-  qs('#share').addEventListener('click', ()=>{ readCfgFromInputs(); copy(updateUrlForShare()); });
-  qs('#export').addEventListener('click', ()=>{ readCfgFromInputs(); copy(encodeCfg(cfg)); });
-  qs('#import').addEventListener('click', ()=>{ const s=prompt('Paste config code'); if(!s) return; const c=decodeCfg(s); if(!c){ toast('Invalid config'); return } cfg={...cfg,...c}; applyCfgToInputs(); toast('Config imported'); });
-  qs('#reset').addEventListener('click', resetMarks);
-  qs('#re-roll').addEventListener('click', ()=>{ els.seed.value = Math.random().toString(36).slice(2,10); generateBoard(); });
-
-  function toggleCountsUi(){
-    const mode = els.countMode.value;
-    qs('#countsRow').style.display = mode==='fixed' ? '' : 'none';
-    qs('#ratiosRow').style.display = mode==='auto' ? '' : 'none';
-  }
-  els.countMode.addEventListener('change', ()=>{ toggleCountsUi(); readCfgFromInputs(); });
-
-  // Restore last board if present
-  function tryRestoreLast(){
-    const last = localStorage.getItem('meeting-bingo-last-grid');
-    if(!last) return false;
-    try{ const {grid} = JSON.parse(last); renderBoard(grid); return true; }catch{ return false }
-  }
-
-  // Initialization
-  useUrlConfigIfAny();
-  applyCfgToInputs();
-  if(params().has('c')){ generateBoard(); }
-  else if(!tryRestoreLast()){ generateBoard(); }
-  restoreMarks();
+window.addEventListener('hashchange', boot);
+window.addEventListener('DOMContentLoaded', boot);
 </script>
-
 </body>
 </html>
