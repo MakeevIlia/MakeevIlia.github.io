@@ -152,8 +152,7 @@
 </body>
 </html>
  -->
-
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -266,8 +265,19 @@
             </select>
           </div>
           <div class="row" style="margin-top:8px">
+            <span>Counts mode</span>
+            <select id="countMode">
+              <option value="fixed">Fixed (manual counts)</option>
+              <option value="auto">Auto (by ratio)</option>
+            </select>
+          </div>
+          <div class="row" id="countsRow" style="margin-top:8px">
             <span>Counts (O/M/R)</span>
             <input id="counts" placeholder="e.g. 12,8,4" />
+          </div>
+          <div class="row" id="ratiosRow" style="margin-top:8px; display:none">
+            <span>Ratios (O/M/R)</span>
+            <input id="ratios" placeholder="e.g. 0.5,0.33,0.17" />
           </div>
           <div class="row" style="margin-top:8px">
             <span>Seed</span>
@@ -329,7 +339,9 @@
     const defaults = {
       size: 5,
       free: true,
+      countMode: 'fixed',
       counts: { often: 12, medium: 8, rare: 4 },
+      ratios: { often: 0.5, medium: 0.33, rare: 0.17 },
       lists: {
         often: [
           'Someone says “you\'re on mute”',
@@ -380,30 +392,42 @@
     // ---- UI wiring ----
     const els = {
       often: qs('#often'), medium: qs('#medium'), rare: qs('#rare'),
-      size: qs('#size'), free: qs('#free'), counts: qs('#counts'), seed: qs('#seed'),
+      size: qs('#size'), free: qs('#free'),
+      countMode: qs('#countMode'), counts: qs('#counts'), ratios: qs('#ratios'),
+      seed: qs('#seed'),
       grid: qs('#grid'),
       setupTab: qs('[data-tab="setup"]'), playTab: qs('[data-tab="play"]'),
       setupPane: qs('#setup'), playPane: qs('#play')
     };
 
     function applyCfgToInputs(){
-      els.often.value = cfg.lists.often.join('\n');
-      els.medium.value = cfg.lists.medium.join('\n');
-      els.rare.value = cfg.lists.rare.join('\n');
+      els.often.value = cfg.lists.often.join('
+');
+      els.medium.value = cfg.lists.medium.join('
+');
+      els.rare.value = cfg.lists.rare.join('
+');
       els.size.value = String(cfg.size);
       els.free.value = String(cfg.free);
+      els.countMode.value = cfg.countMode || 'fixed';
       els.counts.value = `${cfg.counts.often},${cfg.counts.medium},${cfg.counts.rare}`;
+      els.ratios.value = `${cfg.ratios.often},${cfg.ratios.medium},${cfg.ratios.rare}`;
       els.seed.value = cfg.seed || '';
+      toggleCountsUi();
     }
 
     function readCfgFromInputs(){
-      const parseList = v => v.split('\n').map(s=>s.trim()).filter(Boolean);
+      const parseList = v => v.split('
+').map(s=>s.trim()).filter(Boolean);
       const [o,m,r] = (els.counts.value || '').split(',').map(x=>parseInt(x.trim(),10)).map(x=>isFinite(x)?x:0);
+      const [ro,rm,rr] = (els.ratios.value || '').split(',').map(x=>parseFloat(x.trim())).map(x=>isFinite(x)?x:0);
       cfg = {
         ...cfg,
         size: parseInt(els.size.value,10),
         free: els.free.value === 'true',
+        countMode: els.countMode.value,
         counts: { often:o, medium:m, rare:r },
+        ratios: { often:ro, medium:rm, rare:rr },
         lists: {
           often: parseList(els.often.value),
           medium: parseList(els.medium.value),
@@ -453,17 +477,59 @@
       return seededShuffle(uniq, rnd).slice(0,n);
     }
 
+    function normalizeRatios(r){
+      const sum = r.often + r.medium + r.rare;
+      if(sum <= 0) return {often:1, medium:0, rare:0};
+      return { often:r.often/sum, medium:r.medium/sum, rare:r.rare/sum };
+    }
+
+    function allocateCounts(total, ratios, avail){
+      // Largest Remainder Method + capacity handling
+      const r = normalizeRatios(ratios);
+      const raw = { often: total*r.often, medium: total*r.medium, rare: total*r.rare };
+      const base = { often: Math.floor(raw.often), medium: Math.floor(raw.medium), rare: Math.floor(raw.rare) };
+      let assigned = base.often + base.medium + base.rare;
+      const rema = [ ['often', raw.often - base.often], ['medium', raw.medium - base.medium], ['rare', raw.rare - base.rare] ]
+        .sort((a,b)=>b[1]-a[1]);
+      while(assigned < total){
+        for(const [k] of rema){ if(assigned>=total) break; base[k]++; assigned++; }
+      }
+      // Respect availability; reflow shortfalls
+      const result = {...base};
+      const keys = ['often','medium','rare'];
+      let overflow = 0;
+      for(const k of keys){ if(result[k] > avail[k]){ overflow += (result[k]-avail[k]); result[k]=avail[k]; } }
+      while(overflow > 0){
+        // give remaining capacity to any category with room
+        let moved=false;
+        for(const k of keys){ const room = Math.max(0, avail[k]-result[k]); if(room>0){ const add=Math.min(room, overflow); result[k]+=add; overflow-=add; moved=true; if(overflow===0) break; } }
+        if(!moved) break; // nowhere to put
+      }
+      const sumRes = result.often + result.medium + result.rare;
+      return {counts:result, sum:sumRes};
+    }
+
     function generateBoard(){
       readCfgFromInputs();
       const N = cfg.size;
       const cellsCount = N*N - (cfg.free ? 1 : 0);
-      const needTotal = cfg.counts.often + cfg.counts.medium + cfg.counts.rare;
-      if(needTotal !== cellsCount){ toast(`Counts must equal ${cellsCount} (you set ${needTotal}).`); return; }
+
+      let counts = { ...cfg.counts };
+      if(cfg.countMode === 'auto'){
+        const avail = { often: new Set(cfg.lists.often).size, medium: new Set(cfg.lists.medium).size, rare: new Set(cfg.lists.rare).size };
+        const {counts:autoCounts, sum} = allocateCounts(cellsCount, cfg.ratios, avail);
+        if(sum !== cellsCount){ toast(`Not enough unique items to fill ${cellsCount} cells. Add more events or adjust ratios.`); return; }
+        counts = autoCounts;
+      }
+
+      const needTotal = counts.often + counts.medium + counts.rare; return; }
 
       const rnd = cfg.seed ? hashSeed(cfg.seed) : hashSeed(String(Date.now()));
       const chosen = [];
       try{
-        chosen.push(...pickFrom(cfg.lists.often, cfg.counts.often, rnd).map(x=>({t:x,cat:'often'})));
+        chosen.push(...pickFrom(cfg.lists.often, counts.often, rnd).map(x=>({t:x,cat:'often'})));
+        chosen.push(...pickFrom(cfg.lists.medium, counts.medium, rnd).map(x=>({t:x,cat:'medium'})));
+        chosen.push(...pickFrom(cfg.lists.rare, counts.rare, rnd).map(x=>({t:x,cat:'rare'})));.map(x=>({t:x,cat:'often'})));
         chosen.push(...pickFrom(cfg.lists.medium, cfg.counts.medium, rnd).map(x=>({t:x,cat:'medium'})));
         chosen.push(...pickFrom(cfg.lists.rare, cfg.counts.rare, rnd).map(x=>({t:x,cat:'rare'})));
       }catch(e){ toast(e.message); return; }
@@ -573,6 +639,13 @@
     qs('#import').addEventListener('click', ()=>{ const s=prompt('Paste config code'); if(!s) return; const c=decodeCfg(s); if(!c){ toast('Invalid config'); return } cfg={...cfg,...c}; applyCfgToInputs(); toast('Config imported'); });
     qs('#reset').addEventListener('click', resetMarks);
     qs('#re-roll').addEventListener('click', ()=>{ els.seed.value = Math.random().toString(36).slice(2,10); generateBoard(); });
+
+    function toggleCountsUi(){
+      const mode = els.countMode.value;
+      qs('#countsRow').style.display = mode==='fixed' ? '' : 'none';
+      qs('#ratiosRow').style.display = mode==='auto' ? '' : 'none';
+    }
+    els.countMode.addEventListener('change', ()=>{ toggleCountsUi(); readCfgFromInputs(); });
 
     // Restore last board if present
     function tryRestoreLast(){
