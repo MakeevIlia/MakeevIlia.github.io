@@ -314,357 +314,308 @@
 
   <div id="toast" class="toast"></div>
 
-  <script>
-    // ---- Utilities ----
-    const qs = (sel, el=document) => el.querySelector(sel);
-    const qsa = (sel, el=document) => [...el.querySelectorAll(sel)];
+ <script>
+  // ---- Utilities ----
+  const qs = (sel, el=document) => el.querySelector(sel);
+  const qsa = (sel, el=document) => [...el.querySelectorAll(sel)];
 
-    const store = {
-      get k(){ return 'meeting-bingo-v1' },
-      save(cfg){ localStorage.setItem(this.k, JSON.stringify(cfg)); },
-      load(){ try{ return JSON.parse(localStorage.getItem(this.k) || '{}'); }catch{ return {}; } }
-    };
+  const store = {
+    get k(){ return 'meeting-bingo-v1' },
+    save(cfg){ localStorage.setItem(this.k, JSON.stringify(cfg)); },
+    load(){ try{ return JSON.parse(localStorage.getItem(this.k) || '{}'); }catch{ return {}; } }
+  };
 
-    function mulberry32(seed){
-      let t = seed >>> 0;
-      return function(){ t += 0x6D2B79F5; let r = Math.imul(t ^ t >>> 15, 1 | t); r ^= r + Math.imul(r ^ r >>> 7, 61 | r); return ((r ^ r >>> 14) >>> 0) / 4294967296; };
-    }
-    function xmur3(str){ let h=1779033703^str.length; for(let i=0;i<str.length;i++){ h=Math.imul(h^str.charCodeAt(i),3432918353); h=h<<13|h>>>19 } return ()=>{ h=Math.imul(h^h>>>16,2246822507); h=Math.imul(h^h>>>13,3266489909); return (h^h>>>16)>>>0 } }
-    function seededShuffle(arr, rnd){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a }
+  function mulberry32(seed){
+    let t = seed >>> 0;
+    return function(){ t += 0x6D2B79F5; let r = Math.imul(t ^ t >>> 15, 1 | t); r ^= r + Math.imul(r ^ r >>> 7, 61 | r); return ((r ^ r >>> 14) >>> 0) / 4294967296; };
+  }
+  function xmur3(str){ let h=1779033703^str.length; for(let i=0;i<str.length;i++){ h=Math.imul(h^str.charCodeAt(i),3432918353); h=h<<13|h>>>19 } return ()=>{ h=Math.imul(h^h>>>16,2246822507); h=Math.imul(h^h>>>13,3266489909); return (h^h>>>16)>>>0 } }
+  function seededShuffle(arr, rnd){ const a=[...arr]; for(let i=a.length-1;i>0;i++){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a }
 
-    function copy(text){ navigator.clipboard.writeText(text).then(()=>toast('Copied link to clipboard')); }
-    function toast(msg, t=2200){ const el=qs('#toast'); el.textContent = msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), t) }
+  function copy(text){ navigator.clipboard.writeText(text).then(()=>toast('Copied link to clipboard')); }
+  function toast(msg, t=2200){ const el=qs('#toast'); el.textContent = msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), t) }
 
-    // ---- Defaults ----
-    const defaults = {
-      size: 5,
-      free: true,
-      countMode: 'fixed',
-      counts: { often: 12, medium: 8, rare: 4 },
-      ratios: { often: 0.5, medium: 0.33, rare: 0.17 },
+  // ---- Defaults ----
+  const defaults = {
+    size: 5,
+    free: true,
+    countMode: 'fixed',
+    counts: { often: 12, medium: 8, rare: 4 },
+    ratios: { often: 0.5, medium: 0.33, rare: 0.17 },
+    lists: {
+      often: [
+        'Someone says “you\'re on mute”','Awkward 5s silence','“Can you see my screen?”',
+        'Dog or cat cameo','Join/leave chime','Action item assigned','Someone shares the wrong screen',
+        'Wi‑Fi hiccup / robot voice','“Let\'s take this offline”','Keyboard clacking is heard',
+        'Tab explosion in browser','Late joiner asks for recap','Emoji reaction blast',
+        'Someone eating on mic','Background blur toggled'
+      ],
+      medium: [
+        'Spreadsheet is live‑edited','Calendar double‑book conflict','Screen share permission issue',
+        'Unexpected guest joins','Reference to last quarter','Poll launched','“Circling back” appears',
+        'Time zone confusion','Microphone feedback squeal','AI note‑taker joins the call'
+      ],
+      rare: [
+        'Power outage / total drop','Meeting ends early (≥10m)','Live demo actually works first try',
+        'Pet walks on keyboard','Someone joins from a car','Two people talk in unison >3×',
+        'Camera falls over','Whiteboard drawing appears'
+      ]
+    },
+    seed: ''
+  };
+
+  // ---- State ----
+  let cfg = { ...defaults, ...store.load() };
+
+  // ---- UI wiring ----
+  const els = {
+    often: qs('#often'), medium: qs('#medium'), rare: qs('#rare'),
+    size: qs('#size'), free: qs('#free'),
+    countMode: qs('#countMode'), counts: qs('#counts'), ratios: qs('#ratios'),
+    seed: qs('#seed'),
+    grid: qs('#grid'),
+    setupTab: qs('[data-tab="setup"]'), playTab: qs('[data-tab="play"]'),
+    setupPane: qs('#setup'), playPane: qs('#play')
+  };
+
+  function applyCfgToInputs(){
+    els.often.value = cfg.lists.often.join('\n');
+    els.medium.value = cfg.lists.medium.join('\n');
+    els.rare.value = cfg.lists.rare.join('\n');
+    els.size.value = String(cfg.size);
+    els.free.value = String(cfg.free);
+    els.countMode.value = cfg.countMode || 'fixed';
+    els.counts.value = `${cfg.counts.often},${cfg.counts.medium},${cfg.counts.rare}`;
+    els.ratios.value = `${cfg.ratios.often},${cfg.ratios.medium},${cfg.ratios.rare}`;
+    els.seed.value = cfg.seed || '';
+    toggleCountsUi();
+  }
+
+  function readCfgFromInputs(){
+    const parseList = v => v.split('\n').map(s=>s.trim()).filter(Boolean);
+    const [o,m,r] = (els.counts.value || '').split(',').map(x=>parseInt(x.trim(),10)).map(x=>isFinite(x)?x:0);
+    const [ro,rm,rr] = (els.ratios.value || '').split(',').map(x=>parseFloat(x.trim())).map(x=>isFinite(x)?x:0);
+    cfg = {
+      ...cfg,
+      size: parseInt(els.size.value,10),
+      free: els.free.value === 'true',
+      countMode: els.countMode.value,
+      counts: { often:o, medium:m, rare:r },
+      ratios: { often:ro, medium:rm, rare:rr },
       lists: {
-        often: [
-          'Someone says “you\'re on mute”',
-          'Awkward 5s silence',
-          '“Can you see my screen?”',
-          'Dog or cat cameo',
-          'Join/leave chime',
-          'Action item assigned',
-          'Someone shares the wrong screen',
-          'Wi‑Fi hiccup / robot voice',
-          '“Let\'s take this offline”',
-          'Keyboard clacking is heard',
-          'Tab explosion in browser',
-          'Late joiner asks for recap',
-          'Emoji reaction blast',
-          'Someone eating on mic',
-          'Background blur toggled'
-        ],
-        medium: [
-          'Spreadsheet is live‑edited',
-          'Calendar double‑book conflict',
-          'Screen share permission issue',
-          'Unexpected guest joins',
-          'Reference to last quarter',
-          'Poll launched',
-          '“Circling back” appears',
-          'Time zone confusion',
-          'Microphone feedback squeal',
-          'AI note‑taker joins the call'
-        ],
-        rare: [
-          'Power outage / total drop',
-          'Meeting ends early (≥10m)',
-          'Live demo actually works first try',
-          'Pet walks on keyboard',
-          'Someone joins from a car',
-          'Two people talk in unison >3×',
-          'Camera falls over',
-          'Whiteboard drawing appears'
-        ]
+        often: parseList(els.often.value),
+        medium: parseList(els.medium.value),
+        rare: parseList(els.rare.value)
       },
-      seed: ''
+      seed: els.seed.value.trim()
     };
+    store.save(cfg);
+  }
 
-    // ---- State ----
-    let cfg = { ...defaults, ...store.load() };
-
-    // ---- UI wiring ----
-    const els = {
-      often: qs('#often'), medium: qs('#medium'), rare: qs('#rare'),
-      size: qs('#size'), free: qs('#free'),
-      countMode: qs('#countMode'), counts: qs('#counts'), ratios: qs('#ratios'),
-      seed: qs('#seed'),
-      grid: qs('#grid'),
-      setupTab: qs('[data-tab="setup"]'), playTab: qs('[data-tab="play"]'),
-      setupPane: qs('#setup'), playPane: qs('#play')
-    };
-
-    function applyCfgToInputs(){
-      els.often.value = cfg.lists.often.join('
-');
-      els.medium.value = cfg.lists.medium.join('
-');
-      els.rare.value = cfg.lists.rare.join('
-');
-      els.size.value = String(cfg.size);
-      els.free.value = String(cfg.free);
-      els.countMode.value = cfg.countMode || 'fixed';
-      els.counts.value = `${cfg.counts.often},${cfg.counts.medium},${cfg.counts.rare}`;
-      els.ratios.value = `${cfg.ratios.often},${cfg.ratios.medium},${cfg.ratios.rare}`;
-      els.seed.value = cfg.seed || '';
-      toggleCountsUi();
+  // URL state (shareable)
+  function encodeCfg(c){
+    const skinny = { size:c.size, free:c.free, counts:c.counts, seed:c.seed, lists:c.lists };
+    const json = JSON.stringify(skinny);
+    return btoa(unescape(encodeURIComponent(json)));
+  }
+  function decodeCfg(s){
+    try{ const json = decodeURIComponent(escape(atob(s))); return JSON.parse(json); }catch{ return null }
+  }
+  function params(){ const p=new URLSearchParams(location.search); return p }
+  function useUrlConfigIfAny(){
+    const p = params();
+    if(p.has('c')){
+      const conf = decodeCfg(p.get('c'));
+      if(conf){ cfg = { ...cfg, ...conf }; store.save(cfg); }
     }
+    if(p.has('seed')){ cfg.seed = p.get('seed'); }
+  }
+  function updateUrlForShare(){
+    const p = new URLSearchParams();
+    p.set('c', encodeCfg(cfg));
+    if(cfg.seed) p.set('seed', cfg.seed);
+    const url = `${location.origin}${location.pathname}?${p.toString()}`;
+    return url;
+  }
 
-    function readCfgFromInputs(){
-      const parseList = v => v.split('
-').map(s=>s.trim()).filter(Boolean);
-      const [o,m,r] = (els.counts.value || '').split(',').map(x=>parseInt(x.trim(),10)).map(x=>isFinite(x)?x:0);
-      const [ro,rm,rr] = (els.ratios.value || '').split(',').map(x=>parseFloat(x.trim())).map(x=>isFinite(x)?x:0);
-      cfg = {
-        ...cfg,
-        size: parseInt(els.size.value,10),
-        free: els.free.value === 'true',
-        countMode: els.countMode.value,
-        counts: { often:o, medium:m, rare:r },
-        ratios: { often:ro, medium:rm, rare:rr },
-        lists: {
-          often: parseList(els.often.value),
-          medium: parseList(els.medium.value),
-          rare: parseList(els.rare.value)
-        },
-        seed: els.seed.value.trim()
-      };
-      store.save(cfg);
+  // Bingo generation
+  function hashSeed(s){ const h=xmur3(s||'default-seed'); return mulberry32(h()); }
+  function pickFrom(list, n, rnd){
+    if(n<=0) return [];
+    const uniq = [...new Set(list)];
+    if(uniq.length < n) throw new Error(`Not enough unique items (need ${n}, have ${uniq.length})`);
+    return seededShuffle(uniq, rnd).slice(0,n);
+  }
+  function normalizeRatios(r){
+    const sum = r.often + r.medium + r.rare;
+    if(sum <= 0) return {often:1, medium:0, rare:0};
+    return { often:r.often/sum, medium:r.medium/sum, rare:r.rare/sum };
+  }
+  function allocateCounts(total, ratios, avail){
+    const r = normalizeRatios(ratios);
+    const raw = { often: total*r.often, medium: total*r.medium, rare: total*r.rare };
+    const base = { often: Math.floor(raw.often), medium: Math.floor(raw.medium), rare: Math.floor(raw.rare) };
+    let assigned = base.often + base.medium + base.rare;
+    const rema = [ ['often', raw.often - base.often], ['medium', raw.medium - base.medium], ['rare', raw.rare - base.rare] ]
+      .sort((a,b)=>b[1]-a[1]);
+    while(assigned < total){
+      for(const [k] of rema){ if(assigned>=total) break; base[k]++; assigned++; }
     }
-
-    // URL state (shareable)
-    function encodeCfg(c){
-      const skinny = { size:c.size, free:c.free, counts:c.counts, seed:c.seed, lists:c.lists };
-      const json = JSON.stringify(skinny);
-      return btoa(unescape(encodeURIComponent(json)));
-    }
-    function decodeCfg(s){
-      try{ const json = decodeURIComponent(escape(atob(s))); return JSON.parse(json); }catch{ return null }
-    }
-
-    function params(){ const p=new URLSearchParams(location.search); return p }
-
-    function useUrlConfigIfAny(){
-      const p = params();
-      if(p.has('c')){
-        const conf = decodeCfg(p.get('c'));
-        if(conf){ cfg = { ...cfg, ...conf }; store.save(cfg); }
+    const result = {...base};
+    const keys = ['often','medium','rare'];
+    let overflow = 0;
+    for(const k of keys){ if(result[k] > avail[k]){ overflow += (result[k]-avail[k]); result[k]=avail[k]; } }
+    while(overflow > 0){
+      let moved=false;
+      for(const k of keys){
+        const room = Math.max(0, avail[k]-result[k]);
+        if(room>0){ const add=Math.min(room, overflow); result[k]+=add; overflow-=add; moved=true; if(overflow===0) break; }
       }
-      if(p.has('seed')){ cfg.seed = p.get('seed'); }
+      if(!moved) break;
+    }
+    const sumRes = result.often + result.medium + result.rare;
+    return {counts:result, sum:sumRes};
+  }
+
+  function generateBoard(){
+    readCfgFromInputs();
+    const N = cfg.size;
+    const cellsCount = N*N - (cfg.free ? 1 : 0);
+
+    let counts = { ...cfg.counts };
+    if(cfg.countMode === 'auto'){
+      const avail = { often: new Set(cfg.lists.often).size, medium: new Set(cfg.lists.medium).size, rare: new Set(cfg.lists.rare).size };
+      const {counts:autoCounts, sum} = allocateCounts(cellsCount, cfg.ratios, avail);
+      if(sum !== cellsCount){ toast(`Not enough unique items to fill ${cellsCount} cells. Add more events or adjust ratios.`); return; }
+      counts = autoCounts;
+    } else {
+      const needTotal = counts.often + counts.medium + counts.rare;
+      if(needTotal !== cellsCount){ toast(`Counts must equal ${cellsCount} (you set ${needTotal}).`); return; }
     }
 
-    function updateUrlForShare(){
-      const p = new URLSearchParams();
-      p.set('c', encodeCfg(cfg));
-      if(cfg.seed) p.set('seed', cfg.seed);
-      const url = `${location.origin}${location.pathname}?${p.toString()}`;
-      return url;
-    }
+    const rnd = cfg.seed ? hashSeed(cfg.seed) : hashSeed(String(Date.now()));
+    const chosen = [];
+    try{
+      chosen.push(...pickFrom(cfg.lists.often, counts.often, rnd).map(x=>({t:x,cat:'often'})));
+      chosen.push(...pickFrom(cfg.lists.medium, counts.medium, rnd).map(x=>({t:x,cat:'medium'})));
+      chosen.push(...pickFrom(cfg.lists.rare, counts.rare, rnd).map(x=>({t:x,cat:'rare'})));
+    }catch(e){ toast(e.message); return; }
 
-    // Bingo generation
-    function hashSeed(s){ const h=xmur3(s||'default-seed'); return mulberry32(h()); }
+    const rnd2 = hashSeed((cfg.seed||'')+'-layout');
+    const tiles = seededShuffle(chosen, rnd2);
 
-    function pickFrom(list, n, rnd){
-      if(n<=0) return [];
-      const uniq = [...new Set(list)];
-      if(uniq.length < n) throw new Error(`Not enough unique items (need ${n}, have ${uniq.length})`);
-      return seededShuffle(uniq, rnd).slice(0,n);
-    }
-
-    function normalizeRatios(r){
-      const sum = r.often + r.medium + r.rare;
-      if(sum <= 0) return {often:1, medium:0, rare:0};
-      return { often:r.often/sum, medium:r.medium/sum, rare:r.rare/sum };
-    }
-
-    function allocateCounts(total, ratios, avail){
-      // Largest Remainder Method + capacity handling
-      const r = normalizeRatios(ratios);
-      const raw = { often: total*r.often, medium: total*r.medium, rare: total*r.rare };
-      const base = { often: Math.floor(raw.often), medium: Math.floor(raw.medium), rare: Math.floor(raw.rare) };
-      let assigned = base.often + base.medium + base.rare;
-      const rema = [ ['often', raw.often - base.often], ['medium', raw.medium - base.medium], ['rare', raw.rare - base.rare] ]
-        .sort((a,b)=>b[1]-a[1]);
-      while(assigned < total){
-        for(const [k] of rema){ if(assigned>=total) break; base[k]++; assigned++; }
-      }
-      // Respect availability; reflow shortfalls
-      const result = {...base};
-      const keys = ['often','medium','rare'];
-      let overflow = 0;
-      for(const k of keys){ if(result[k] > avail[k]){ overflow += (result[k]-avail[k]); result[k]=avail[k]; } }
-      while(overflow > 0){
-        // give remaining capacity to any category with room
-        let moved=false;
-        for(const k of keys){ const room = Math.max(0, avail[k]-result[k]); if(room>0){ const add=Math.min(room, overflow); result[k]+=add; overflow-=add; moved=true; if(overflow===0) break; } }
-        if(!moved) break; // nowhere to put
-      }
-      const sumRes = result.often + result.medium + result.rare;
-      return {counts:result, sum:sumRes};
-    }
-
-    function generateBoard(){
-      readCfgFromInputs();
-      const N = cfg.size;
-      const cellsCount = N*N - (cfg.free ? 1 : 0);
-
-      let counts = { ...cfg.counts };
-      if(cfg.countMode === 'auto'){
-        const avail = { often: new Set(cfg.lists.often).size, medium: new Set(cfg.lists.medium).size, rare: new Set(cfg.lists.rare).size };
-        const {counts:autoCounts, sum} = allocateCounts(cellsCount, cfg.ratios, avail);
-        if(sum !== cellsCount){ toast(`Not enough unique items to fill ${cellsCount} cells. Add more events or adjust ratios.`); return; }
-        counts = autoCounts;
-      }
-
-      const needTotal = counts.often + counts.medium + counts.rare; return; }
-
-      const rnd = cfg.seed ? hashSeed(cfg.seed) : hashSeed(String(Date.now()));
-      const chosen = [];
-      try{
-        chosen.push(...pickFrom(cfg.lists.often, counts.often, rnd).map(x=>({t:x,cat:'often'})));
-        chosen.push(...pickFrom(cfg.lists.medium, counts.medium, rnd).map(x=>({t:x,cat:'medium'})));
-        chosen.push(...pickFrom(cfg.lists.rare, counts.rare, rnd).map(x=>({t:x,cat:'rare'})));.map(x=>({t:x,cat:'often'})));
-        chosen.push(...pickFrom(cfg.lists.medium, cfg.counts.medium, rnd).map(x=>({t:x,cat:'medium'})));
-        chosen.push(...pickFrom(cfg.lists.rare, cfg.counts.rare, rnd).map(x=>({t:x,cat:'rare'})));
-      }catch(e){ toast(e.message); return; }
-
-      const rnd2 = hashSeed((cfg.seed||'')+'-layout');
-      const tiles = seededShuffle(chosen, rnd2);
-
-      const grid = [];
-      let k=0;
-      for(let r=0;r<N;r++){
-        const row=[];
-        for(let c=0;c<N;c++){
-          if(cfg.free && r===Math.floor(N/2) && c===Math.floor(N/2)){
-            row.push({t:'FREE',cat:'free',marked:true});
-          }else{
-            row.push(tiles[k++]);
-          }
+    const grid = [];
+    let k=0;
+    for(let r=0;r<N;r++){
+      const row=[];
+      for(let c=0;c<N;c++){
+        if(cfg.free && r===Math.floor(N/2) && c===Math.floor(N/2)){
+          row.push({t:'FREE',cat:'free',marked:true});
+        }else{
+          row.push(tiles[k++]);
         }
-        grid.push(row);
       }
-      renderBoard(grid);
-      els.playTab.click();
-      // Persist last generated layout for reload
-      localStorage.setItem('meeting-bingo-last-grid', JSON.stringify({grid, N}));
+      grid.push(row);
     }
+    renderBoard(grid);
+    els.playTab.click();
+    localStorage.setItem('meeting-bingo-last-grid', JSON.stringify({grid, N}));
+  }
 
-    function renderBoard(grid){
-      const N = grid.length;
-      els.grid.style.gridTemplateColumns = `repeat(${N},1fr)`;
-      els.grid.innerHTML = '';
-      grid.forEach((row, r)=>{
-        row.forEach((cell, c)=>{
-          const d=document.createElement('div');
-          d.className = 'cell'+(cell.cat==='free'?' free':'');
-          if(cell.marked) d.classList.add('marked');
-          d.dataset.r=r; d.dataset.c=c; d.dataset.cat=cell.cat;
-          d.innerHTML = `<small>${cell.cat}</small><div class="label">${escapeHtml(cell.t)}</div>`;
-          d.addEventListener('click', ()=>{
-            d.classList.toggle('marked');
-            checkBingo();
-            saveMarks();
-          });
-          els.grid.appendChild(d);
-        })
+  function renderBoard(grid){
+    const N = grid.length;
+    els.grid.style.gridTemplateColumns = `repeat(${N},1fr)`;
+    els.grid.innerHTML = '';
+    grid.forEach((row, r)=>{
+      row.forEach((cell, c)=>{
+        const d=document.createElement('div');
+        d.className = 'cell'+(cell.cat==='free'?' free':'');
+        if(cell.marked) d.classList.add('marked');
+        d.dataset.r=r; d.dataset.c=c; d.dataset.cat=cell.cat;
+        d.innerHTML = `<small>${cell.cat}</small><div class="label">${escapeHtml(cell.t)}</div>`;
+        d.addEventListener('click', ()=>{
+          d.classList.toggle('marked');
+          checkBingo();
+          saveMarks();
+        });
+        els.grid.appendChild(d);
       })
-      checkBingo();
+    })
+    checkBingo();
+  }
+
+  function escapeHtml(str){ return str.replace(/[&<>\"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])) }
+  function saveMarks(){ const marks = qsa('.cell').map((el)=>el.classList.contains('marked')?1:0); localStorage.setItem('meeting-bingo-marks', JSON.stringify(marks)); }
+  function restoreMarks(){ const s = localStorage.getItem('meeting-bingo-marks'); if(!s) return; try{ const marks = JSON.parse(s); qsa('.cell').forEach((el,i)=>{ if(marks[i]) el.classList.add('marked'); else el.classList.remove('marked'); }); }catch{} }
+  function resetMarks(){ qsa('.cell').forEach(el=>el.classList.remove('marked')); saveMarks(); }
+
+  function checkBingo(){
+    const cells = qsa('.cell');
+    if(cells.length===0) return;
+    const N = Math.sqrt(cells.length);
+    const M = [...Array(N)].map(()=>Array(N).fill(false));
+    cells.forEach((el,i)=>{ const r=Math.floor(i/N), c=i%N; M[r][c]=el.classList.contains('marked') });
+
+    const lines=[];
+    for(let i=0;i<N;i++){
+      if(M[i].every(Boolean)) lines.push('row');
+      if(M.map(r=>r[i]).every(Boolean)) lines.push('col');
     }
+    if(M.map((r,i)=>r[i]).every(Boolean)) lines.push('diag');
+    if(M.map((r,i)=>r[N-1-i]).every(Boolean)) lines.push('diag');
+    if(lines.length>0){ toast(`BINGO! (${lines.length} line${lines.length>1?'s':''}) 🎉`, 1800); confetti(); }
+  }
 
-    function escapeHtml(str){ return str.replace(/[&<>\"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])) }
-
-    function saveMarks(){
-      const marks = qsa('.cell').map((el,i)=>el.classList.contains('marked')?1:0);
-      localStorage.setItem('meeting-bingo-marks', JSON.stringify(marks));
+  function confetti(){
+    const n=80; const container=document.body; const w=window.innerWidth, h=window.innerHeight;
+    for(let i=0;i<n;i++){
+      const s=document.createElement('div');
+      s.style.position='fixed'; s.style.left=(Math.random()*w)+'px'; s.style.top='-10px'; s.style.width='6px'; s.style.height='10px';
+      s.style.background=`hsl(${Math.random()*360},90%,60%)`; s.style.opacity='0.9'; s.style.borderRadius='2px'; s.style.transform=`rotate(${Math.random()*360}deg)`;
+      s.style.zIndex=30; container.appendChild(s);
+      const dur=800+Math.random()*1200; const dx=(-40+Math.random()*80);
+      s.animate([{transform:s.style.transform, top:'-10px'},{transform:`translate(${dx}px, ${h+20}px) rotate(${Math.random()*360}deg)`, top:(h+20)+'px'}],{duration:dur, easing:'cubic-bezier(.2,.7,.2,1)'}).onfinish=()=>s.remove();
     }
+  }
 
-    function restoreMarks(){
-      const s = localStorage.getItem('meeting-bingo-marks');
-      if(!s) return;
-      try{ const marks = JSON.parse(s); qsa('.cell').forEach((el,i)=>{ if(marks[i]) el.classList.add('marked'); else el.classList.remove('marked'); }); }catch{}
-    }
+  // ---- Event hooks ----
+  qsa('.tab').forEach(btn=>btn.addEventListener('click',()=>{
+    qsa('.tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    qsa('.tabpane').forEach(p=>p.style.display='none');
+    qs('#'+tab).style.display='block';
+  }));
 
-    function resetMarks(){ qsa('.cell').forEach(el=>el.classList.remove('marked')); saveMarks(); }
+  qs('#generate').addEventListener('click', generateBoard);
+  qs('#random-seed').addEventListener('click', ()=>{ els.seed.value = Math.random().toString(36).slice(2,10); toast('New random seed set'); });
+  qs('#share').addEventListener('click', ()=>{ readCfgFromInputs(); copy(updateUrlForShare()); });
+  qs('#export').addEventListener('click', ()=>{ readCfgFromInputs(); copy(encodeCfg(cfg)); });
+  qs('#import').addEventListener('click', ()=>{ const s=prompt('Paste config code'); if(!s) return; const c=decodeCfg(s); if(!c){ toast('Invalid config'); return } cfg={...cfg,...c}; applyCfgToInputs(); toast('Config imported'); });
+  qs('#reset').addEventListener('click', resetMarks);
+  qs('#re-roll').addEventListener('click', ()=>{ els.seed.value = Math.random().toString(36).slice(2,10); generateBoard(); });
 
-    function checkBingo(){
-      const cells = qsa('.cell');
-      if(cells.length===0) return;
-      const N = Math.sqrt(cells.length);
-      const M = [...Array(N)].map(()=>Array(N).fill(false));
-      cells.forEach((el,i)=>{ const r=Math.floor(i/N), c=i%N; M[r][c]=el.classList.contains('marked') });
+  function toggleCountsUi(){
+    const mode = els.countMode.value;
+    qs('#countsRow').style.display = mode==='fixed' ? '' : 'none';
+    qs('#ratiosRow').style.display = mode==='auto' ? '' : 'none';
+  }
+  els.countMode.addEventListener('change', ()=>{ toggleCountsUi(); readCfgFromInputs(); });
 
-      const lines=[];
-      for(let i=0;i<N;i++){
-        if(M[i].every(Boolean)) lines.push('row');
-        if(M.map(r=>r[i]).every(Boolean)) lines.push('col');
-      }
-      if(M.map((r,i)=>r[i]).every(Boolean)) lines.push('diag');
-      if(M.map((r,i)=>r[N-1-i]).every(Boolean)) lines.push('diag');
-      if(lines.length>0){ toast(`BINGO! (${lines.length} line${lines.length>1?'s':''}) 🎉`, 1800); confetti(); }
-    }
+  // Restore last board if present
+  function tryRestoreLast(){
+    const last = localStorage.getItem('meeting-bingo-last-grid');
+    if(!last) return false;
+    try{ const {grid} = JSON.parse(last); renderBoard(grid); return true; }catch{ return false }
+  }
 
-    function confetti(){
-      // Tiny confetti without external libs
-      const n=80; const container=document.body; const frags=[]; const w=window.innerWidth, h=window.innerHeight;
-      for(let i=0;i<n;i++){
-        const s=document.createElement('div');
-        s.style.position='fixed'; s.style.left=(Math.random()*w)+'px'; s.style.top='-10px'; s.style.width='6px'; s.style.height='10px';
-        s.style.background=`hsl(${Math.random()*360},90%,60%)`; s.style.opacity='0.9'; s.style.borderRadius='2px'; s.style.transform=`rotate(${Math.random()*360}deg)`;
-        s.style.zIndex=30; container.appendChild(s); frags.push(s);
-        const dur=800+Math.random()*1200; const dx=(-40+Math.random()*80);
-        s.animate([{transform:s.style.transform, top:'-10px'},{transform:`translate(${dx}px, ${h+20}px) rotate(${Math.random()*360}deg)`, top:(h+20)+'px'}],{duration:dur, easing:'cubic-bezier(.2,.7,.2,1)'}).onfinish=()=>s.remove();
-      }
-    }
+  // Initialization
+  useUrlConfigIfAny();
+  applyCfgToInputs();
+  if(params().has('c')){ generateBoard(); }
+  else if(!tryRestoreLast()){ generateBoard(); }
+  restoreMarks();
+</script>
 
-    // ---- Event hooks ----
-    qsa('.tab').forEach(btn=>btn.addEventListener('click',()=>{
-      qsa('.tab').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      const tab = btn.dataset.tab;
-      qsa('.tabpane').forEach(p=>p.style.display='none');
-      qs('#'+tab).style.display='block';
-    }))
-
-    qs('#generate').addEventListener('click', generateBoard);
-    qs('#random-seed').addEventListener('click', ()=>{ els.seed.value = Math.random().toString(36).slice(2,10); toast('New random seed set'); });
-    qs('#share').addEventListener('click', ()=>{ readCfgFromInputs(); copy(updateUrlForShare()); });
-    qs('#export').addEventListener('click', ()=>{ readCfgFromInputs(); copy(encodeCfg(cfg)); });
-    qs('#import').addEventListener('click', ()=>{ const s=prompt('Paste config code'); if(!s) return; const c=decodeCfg(s); if(!c){ toast('Invalid config'); return } cfg={...cfg,...c}; applyCfgToInputs(); toast('Config imported'); });
-    qs('#reset').addEventListener('click', resetMarks);
-    qs('#re-roll').addEventListener('click', ()=>{ els.seed.value = Math.random().toString(36).slice(2,10); generateBoard(); });
-
-    function toggleCountsUi(){
-      const mode = els.countMode.value;
-      qs('#countsRow').style.display = mode==='fixed' ? '' : 'none';
-      qs('#ratiosRow').style.display = mode==='auto' ? '' : 'none';
-    }
-    els.countMode.addEventListener('change', ()=>{ toggleCountsUi(); readCfgFromInputs(); });
-
-    // Restore last board if present
-    function tryRestoreLast(){
-      const last = localStorage.getItem('meeting-bingo-last-grid');
-      if(!last) return false;
-      try{ const {grid} = JSON.parse(last); renderBoard(grid); return true; }catch{ return false }
-    }
-
-    // Initialization
-    useUrlConfigIfAny();
-    applyCfgToInputs();
-
-    // If a share link brought us here, jump straight to play and generate from seed
-    if(params().has('c')){ generateBoard(); }
-    else if(!tryRestoreLast()){
-      // render a sample board from defaults
-      generateBoard();
-    }
-    restoreMarks();
-  </script>
 </body>
 </html>
